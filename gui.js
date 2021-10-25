@@ -17,7 +17,7 @@ hotkeys('ctrl+b', function (event, handler){
           }
 });
 // Start the worker in which sql.js will run
-var worker = new Worker("worker.sql-asm.js");
+var worker = new Worker("worker.sql-wasm.js");
 
 // Open a database
 worker.postMessage({ action: 'open' });
@@ -68,13 +68,6 @@ function indexForNewItemInHistory() {
   return mostRecent;
 }
 
-function saveQueryToHistory(sql, result) {
-  let index = indexForNewItemInHistory();
-  localStorage.setItem('qHistLast', index);
-  let k = 'qH' + String(index);
-  localforage.setItem(k, {sql:sql, result: result});
-}
-
 // Create a cell for entering commands
 var createCell = function () {
 	return function (container, sql) {
@@ -90,6 +83,14 @@ var createCell = function () {
       errorElm.textContent = e.message;
       output.textContent = "";
     }
+    async function saveQueryToHistory(sql, result) {
+      let index = indexForNewItemInHistory();
+      let k = 'qH' + String(index);
+      await localforage.setItem(k, {sql:sql, result: result});
+      localStorage.setItem('qHistLast', index);
+      currentPosInHistory = index;
+    }
+
     async function getItemFromHistory(i) {
       let k = 'qH' + String(i);
       const item = await localforage.getItem(k);
@@ -97,14 +98,21 @@ var createCell = function () {
       output.innerHTML = item.result;
     }
 
-    function saveToHistory() {
+    async function saveToHistory() {
       let s = editor.getDoc().getValue();
       let r = output.innerHTML;
+      // If there's no result to save, don't save to history.
       if (!r) {
         return;
       }
-      saveQueryToHistory(s,r);
       currentPosInHistory = indexForMostRecentItemInHistory();
+      let k = 'qH' + String(currentPosInHistory);
+      const item = await localforage.getItem(k);
+      // If the sql is the same as the most recent item, don't save.
+      if (item.sql == s) {
+        return;
+      }
+      saveQueryToHistory(s,r);
     }
     function getPreviousItemInHistory() {
       // Reached the end of the history or there's no history?
@@ -338,7 +346,7 @@ vsvFileElm.onchange = function () {
   if (!f) { return; }
 	var r = new FileReader();
 	r.onload = function () {
-    let [data, sep] = getDataAndSeparator(r.result, f.name);
+    let [data, sep, header] = getDataAndSeparator(r.result, f.name);
 		if (sep == "-1") {
 			error("Can't determine a field delimiter from the file suffix or contents.");
       return;
@@ -363,10 +371,12 @@ vsvFileElm.onchange = function () {
     };
     for (let d of data) {
       try {
-        worker.postMessage({ action: 'createVSVTable', buffer: d[0], fileName: d[1], separator: sep, quick: true }, [d[0]]);
+        worker.postMessage({ action: 'createVSVTable', buffer: d[0], fileName: d[1],
+          separator: sep, quick: true, header:header }, [d[0]]);
       }
       catch (exception) {
-        worker.postMessage({ action: 'createVSVTable', buffer: d[0], fileName: d[1], separator: sep, quick: true });
+        worker.postMessage({ action: 'createVSVTable', buffer: d[0], fileName: d[1],
+          separator: sep, quick: true, header:header });
       }
     }
 	}
