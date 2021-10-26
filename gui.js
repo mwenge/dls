@@ -83,9 +83,14 @@ var createCell = function () {
       errorElm.textContent = e.message;
       output.textContent = "";
     }
+    let storageLimit = 1024 * 128; // 128k
     async function saveQueryToHistory(sql, result) {
       let index = indexForNewItemInHistory();
       let k = 'qH' + String(index);
+      // Don't store exessively large results.
+      if (result.length > storageLimit) {
+        result = "Result was too large to store without impacting performance."
+      }
       await localforage.setItem(k, {sql:sql, result: result});
       localStorage.setItem('qHistLast', index);
       currentPosInHistory = index;
@@ -109,7 +114,7 @@ var createCell = function () {
       let k = 'qH' + String(currentPosInHistory);
       const item = await localforage.getItem(k);
       // If the sql is the same as the most recent item, don't save.
-      if (item.sql == s) {
+      if (item && item.sql == s) {
         return;
       }
       saveQueryToHistory(s,r);
@@ -219,7 +224,9 @@ var createCell = function () {
 
     const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
-    let selectedTheme = "default";
+    // let selectedTheme = "default";
+    // Use dark theme by default
+    let selectedTheme = "3024-night";
     if (prefersDarkScheme.matches) {
       selectedTheme = "3024-night";
     }
