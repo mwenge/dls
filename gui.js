@@ -478,11 +478,60 @@ var createCell = function () {
         "Ctrl-O": openFile,
         "Alt-Left": getPreviousItemInHistory,
         "Alt-Right": getNextItemInHistory,
-        "Tab": false,
-        "Shift-Tab": false,
+        "Tab": function(cm,e) {
+          function hasNonWhiteSpace(s) { return /[^\s]/g.test(s); }
+          let to = cm.getCursor();
+          let from = {line: to.line, ch: 0};
+          let pt = cm.getRange(from, to);
+          if (hasNonWhiteSpace(pt)) {
+            CodeMirror.commands.autocomplete(cm);
+          } else {
+            CodeMirror.commands.insertSoftTab(cm);
+          }
+        },
+        "Esc" : function() {
+          editor.getWrapperElement().focus();
+        },
       }
     });
+    editor.getWrapperElement().setAttribute("tabindex", "0");
     editors.set(container.id, editor);
+
+    editor.getWrapperElement().className += " editorContainer";
+    // Handle navigation between cells.
+    editor.getWrapperElement().addEventListener('keydown', (event) => {
+      // Ignore the event if we're not navigating the cell elements.
+      let w = editor.getWrapperElement();
+      if (w.className != document.activeElement.className) {
+        return;
+      }
+      const keyName = event.key;
+      if (keyName == 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        editor.focus();
+      }
+      if (keyName == 'ArrowUp') {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log(document.activeElement);
+        var p = editor.getWrapperElement().parentElement;
+        var ps = p.previousSibling;
+        if (!ps) return;
+        var n = ps.children[1];
+        n.focus();
+      }
+      if (keyName == 'ArrowDown') {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log(document.activeElement);
+        var p = editor.getWrapperElement().parentElement;
+        var ps = p.nextSibling;
+        if (!ps) return;
+        var n = ps.children[1];
+        n.focus();
+      }
+    });
 
     // Add the tips line
 		var tipsElm = document.createElement('span');
@@ -492,7 +541,7 @@ var createCell = function () {
                           "<b>Alt-T:</b> Rich Query Results, " +
                           "<b>Alt-Enter:</b> Line Chart Results, " +
                           "<b>Alt-P:</b> Pivot Chart Results, " +
-                          "<b>Ctrl-Space:</b> Autocomplete. " +
+                          "<b>Ctrl-Space or Tab:</b> Autocomplete. " +
                           "";
     container.appendChild(tipsElm);
 
